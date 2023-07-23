@@ -32,7 +32,9 @@ public class ResourceResolver {
         this.basePackage = basePackage;
     }
 
+    //获取扫描到得basePackage
     public <R> List<R> scan(Function<Resource, R> mapper) throws IOException, URISyntaxException {
+        //将包名转化为路径
         String basePackagePath = this.basePackage.replace(".", "/");
         String path = basePackagePath;
         List<R> collector = new ArrayList<>();
@@ -42,15 +44,18 @@ public class ResourceResolver {
 
     <R> void scanO(String basePackagePath, String path, List<R> collector, Function<Resource, R> mapper) throws IOException, URISyntaxException {
         logger.atDebug().log("scan path: {}", path);
+        // 通过ClassLoader获取URL列表:
         Enumeration<URL> en = getContextClassLoader().getResources(path);
         while (en.hasMoreElements()) {
             URL url = en.nextElement();
             URI uri = url.toURI();
             String uriStr = removeTrailingSlash(uriToString(uri));
             String uriBaseStr = uriStr.substring(0, uriStr.length() - basePackagePath.length());
+            // 在目录中搜索
             if (uriBaseStr.startsWith("file:")) {
                 uriBaseStr = uriBaseStr.substring(5);
             }
+            // 在Jar包中搜索
             if (uriStr.startsWith("jar:")) {
                 scanFile(true, uriBaseStr, jarUriToPath(basePackagePath, uri), collector, mapper);
             }
@@ -59,19 +64,23 @@ public class ResourceResolver {
     }
 
     <R> void scanFile(boolean isJar, String uriBaseStr, Path jarUriToPath, List<R> collector, Function<Resource, R> mapper) throws IOException {
+        //除去路径中最后的分隔符
         String baseDir = removeTrailingSlash(uriBaseStr);
+        //遍历文件并且过滤掉不可读文件
         Files.walk(jarUriToPath).filter(Files::isReadable).forEach(file -> {
             Resource resource = null;
             if (isJar) {
+                //创建文件
                 resource = new Resource(baseDir, removeLeadingSlash(file.toString()));
             } else {
                 String path = file.toString();
                 String name = removeLeadingSlash(path.substring(baseDir.length()));
                 resource = new Resource("file:" + path, name);
             }
-            logger.atDebug().log("found resource: {}",resource);
-            R r =mapper.apply(resource);
-            if (r != null){
+            logger.atDebug().log("found resource: {}", resource);
+            //传递文件对象
+            R r = mapper.apply(resource);
+            if (r != null) {
                 collector.add(r);
             }
         });
