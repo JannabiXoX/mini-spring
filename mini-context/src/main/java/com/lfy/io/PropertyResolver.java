@@ -116,7 +116,7 @@ public class PropertyResolver {
         return convert(targetType, value);
     }
 
-    private <T> T convert(Class<T> clazz, String value) {
+    public <T> T convert(Class<T> clazz, String value) {
         Function<String,Object> fun = this.converters.get(clazz);
         if (fun == null){
             throw new IllegalArgumentException("Unsupported value type: " + clazz.getName());
@@ -124,10 +124,26 @@ public class PropertyResolver {
         return (T) fun.apply(value);
     }
 
-    private String parseValue(String value) {
+    public String parseValue(String value) {
+        PropertyExpr expr = parsePropertyExpr(value);
+        if (expr == null) {
+            return value;
+        }
+        if (expr.defaultValue() != null) {
+            return getProperty(expr.key(), expr.defaultValue());
+        } else {
+            return getRequiredProperty(expr.key());
+        }
     }
 
-    private String getRequiredProperty(String key) {
+    public String getRequiredProperty(String key) {
+        String value = getProperty(key);
+        return Objects.requireNonNull(value, "Property '" + key + "' not found.");
+    }
+
+    public <T> T getRequiredProperty(String key, Class<T> targetType) {
+        T value = getProperty(key, targetType);
+        return Objects.requireNonNull(value, "Property '" + key + "' not found.");
     }
 
     public String getProperty(String key, String defaultValue) {
